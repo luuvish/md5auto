@@ -226,7 +226,7 @@ class FileLog(object):
         if self.name:
             if self.temp:
                 from tempfile import mkstemp
-                fd, self.temp = mkstemp()
+                fd, self.temp = mkstemp(text=False)
                 self.file = codecs.EncodedFile(os.fdopen(fd, 'w'), 'utf-8')
             else:
                 dirname, basename = os.path.split(self.name)
