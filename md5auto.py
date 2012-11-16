@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import sys, os, time, codecs
+import sys, os, time
+import codecs, unicodedata
 
 
 class HashList(object):
@@ -16,6 +17,7 @@ class HashList(object):
         from fnmatch import fnmatch
         items = []
         for path in paths:
+            path = unicodedata.normalize('NFC', path.decode('utf-8'))
             os.chdir(path)
             item = []
             for (dirpath, dirnames, filenames) in os.walk('.'):
@@ -23,6 +25,7 @@ class HashList(object):
                     if fnmatch(name, '@*'):
                         continue
                     fn = os.path.normpath(os.path.join(dirpath, name))
+                    fn = unicodedata.normalize('NFC', fn.decode('utf-8'))
                     try:
                         fs = HashList.filesize(fn)
                     except IOError:
@@ -49,12 +52,10 @@ class HashList(object):
                     if len(item) > 0:
                         items.append([path, item])
                     path = os.path.normpath(line[7:])
-                    path = path.encode('utf-8')
                     item = []
                     continue
                 try:
                     hd, fn = line.split(' *')
-                    fn = fn.encode('utf-8')
                 except ValueError:
                     continue
                 try:
@@ -88,7 +89,7 @@ class HashList(object):
             stime = time.time()
             match = 0
             error = 0
-            lines.write('\n#!path=%s\n\n' % (path.decode('utf-8')))
+            lines.write('\n#!path=%s\n\n' % (path))
             for (fn, fs, hd) in item:
                 try:
                     hd = self.hash(os.path.normpath(os.path.join(path, fn)))
@@ -96,7 +97,7 @@ class HashList(object):
                 except IOError:
                     hd = 'x' * 32
                     error += 1
-                lines.write('%s *%s\n' % (hd.lower(), fn.decode('utf-8')))
+                lines.write('%s *%s\n' % (hd.lower(), fn))
                 if self.stats:
                     self.stats.write('%3d%% (%d/%d) (%d/%d)\r' %
                                      (100 * self.stats.nbyte / self.stats.bytes,
@@ -128,10 +129,10 @@ class HashList(object):
                 except IOError:
                     hr = 'x' * 32
                 if hd.lower() == hr.lower():
-                    lines.write('match(%s) = %s\n' % (hd.lower(), fn.decode('utf-8')))
+                    lines.write('match(%s) = %s\n' % (hd.lower(), fn))
                     match += 1
                 else:
-                    lines.write('error(%s) = %s\n' % (hr.lower(), fn.decode('utf-8')))
+                    lines.write('error(%s) = %s\n' % (hr.lower(), fn))
                     error += 1
                 if self.stats:
                     self.stats.write('%3d%% (%d/%d) (%d/%d)\r' %
@@ -228,10 +229,12 @@ class FileLog(object):
                 fd, self.temp = mkstemp()
                 self.file = codecs.EncodedFile(os.fdopen(fd, 'w'), 'utf-8')
             else:
-                dirname = os.path.dirname(self.name)
+                dirname, basename = os.path.split(self.name)
                 if dirname and not os.path.exists(dirname):
                     os.mkdir(dirname)
-                self.file = codecs.open(self.name, 'w', 'utf-8')
+                lofmt = lambda f, v: time.strftime(f, time.localtime(v))
+                stime = lofmt('%Y%m%d-%H%M%S-', time.time())
+                self.file = codecs.open(os.path.normpath(os.path.join(dirname, stime + basename)), 'w', 'utf-8')
 
     def close(self):
         if self.name:
@@ -275,7 +278,8 @@ def options(argv):
 
 def make(opts):
     hashs = HashList()
-    hashs.init_from_paths(opts.paths)
+    paths = [path for path in opts.paths if os.path.isdir(path)]
+    hashs.init_from_paths(paths)
     stats = hashs.init_stats()
     try:
         dirname = os.path.dirname(opts.out)
@@ -302,7 +306,7 @@ def test(opts):
         path.close()
     stats = hashs.init_stats()
     try:
-        log = FileLog(temp=True)
+        log = FileLog(temp=False)
         log.open(opts.log)
     except IOError:
         sys.stderr.write('Can\'t open file: %s\n' % (opts.log))
