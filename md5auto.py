@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import sys, os, time
 import codecs, unicodedata
@@ -27,10 +28,7 @@ class HashList(object):
                     fn = os.path.normpath(os.path.join(dirpath, name))
                     fn = unicodedata.normalize('NFC', fn.decode('utf-8'))
                     try:
-                        fs = HashList.filesize(fn)
-                    except IOError:
-                        self.error('Can\'t open file: %s\n' % (fn))
-                        continue
+                        fs = os.path.getsize(fn)
                     except OSError:
                         self.error('Can\'t open file: %s\n' % (fn))
                         continue
@@ -59,22 +57,14 @@ class HashList(object):
                 except ValueError:
                     continue
                 try:
-                    fs = HashList.filesize(os.path.normpath(os.path.join(path, fn)))
-                except IOError:
+                    fs = os.path.getsize(os.path.normpath(os.path.join(path, fn)))
+                except OSError:
                     self.error('Can\'t open file: %s\n' % (fn))
                     continue
                 item.append([fn, fs, hd])
             if len(item) > 0:
                 items.append([path, item])
         self.items = items
-
-    @staticmethod
-    def filesize(pathname):
-        fd = os.open(pathname, os.O_RDONLY)
-        ft = os.fstat(fd)
-        fs = ft.st_size
-        os.close(fd)
-        return fs
 
     def init_stats(self):
         stats = HashStats(self.items)
@@ -208,9 +198,11 @@ class HashStats(object):
 
     def error(self, *args, **kargs):
         sys.stderr.write(*args, **kargs)
+        sys.stderr.flush()
 
     def write(self, *args, **kargs):
         sys.stdout.write(*args, **kargs)
+        sys.stdout.flush()
 
 
 class FileLog(object):
